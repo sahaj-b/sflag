@@ -94,7 +94,6 @@ func Parse(target any, opts ...Options) ([]string, error) {
 	}
 
 	fs := flag.NewFlagSet(progName, flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
 	var definedFlags []flagDef
 	usedNames := make(map[string]bool)
 
