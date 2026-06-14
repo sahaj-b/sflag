@@ -6,39 +6,48 @@ A minimal, opinionated library for struct-tagged CLI flags for Go. Zero deps, wr
 ```go
 var flags struct {
   Verbose    bool
-  Date       string  `help:"in YYYY-MM-DD format"`
-  Range      string  `default:"7d" help:"Range of data"`
-  Rate       float64 `short:"R"`
-  MaxRetries int     `flag:"max" short:"" default:"3" help:"Max retries"`
+  Date       string        `help:"in YYYY-MM-DD format"`
+  Range      string        `default:"7d" help:"Range of data"`
+  Rate       float64       `short:"R"`
+  MaxRetries int           `flag:"max" short:"" default:"3" help:"Max retries"`
+  Timeout    time.Duration `positional:"" default:"30s" help:"Request timeout"`
+  Files      []string      `positional:"" help:"Additional files"`
 }
-args, err := sflag.Parse(&flags)
-fmt.Println(flags.Date)
-fmt.Println(args)
+err := sflag.Parse(&flags)
+fmt.Println(flags.Date)         
 ```
 
 ### Help example
-<img width="801" height="322" alt="image" src="https://github.com/user-attachments/assets/e37b5721-e811-4400-a5fe-2f7576a30f1f" />
+<img width="847" height="471" alt="image" src="https://github.com/user-attachments/assets/7119cc66-d967-4c61-9586-21a69b84de92" />
 
 ## Features
 
 - **Auto names**: field `ApiKey` → `--api-key` (kebab-case)
 - **Auto shorts**: first char of flag name. Conflicts silently skipped
 - **Positional args**: returned from `Parse`, also `--` stops flag parsing, same as `flag` 
+- **Positional args**: `positional:""` tag binds CLI positionals to struct fields
 - **Colored help**: and plain text when piped (unix-based). [**`NO_COLOR`**](https://no-color.org/) respected
-- **Stdlib `flag`** behavior: `-flag`, `--flag`, and `--flag=true` all work
+- **Stdlib `flag`** behavior: `-myflag`, `--myflag`, and `--myflag=true` all work
 
 ## Tags
 
-| Tag             | Default                  |
-| -----           | ---------                |
-| `flag:"name"`   | kebab-case of field name |
-| `short:"x"`     | first char of long name  |
-| `default:"val"` | zero value               |
-| `help:"text"`   | empty                    |
+| Tag             | Default                       |
+| -----           | ---------                     |
+| `flag:"name"`   | kebab-case of field name      |
+| `short:"x"`     | first char of long name       |
+| `default:"val"` | zero value                    |
+| `help:"text"`   | empty                         |
+| `positional:""` | marks field as positional arg |
 
+
+## Positional args (`positional:""`) Rules
+- Must be grouped together (no non-positionals between them)
+- Only the last positional field can be `[]string` (variadic)
+- `flag:""` tags on positional fields are ignored
+- `default:"val"` in positional fields make them optional (wrapped in `[]` in help)
+- `default:"val"` is ignored for **variadic**(`[]string`) positionals
 
 ## Options
-
 ```go
 sflag.Parse(&cfg, sflag.Options{
   ProgramName:  "myapp", // app name shown in help, default: os.Args[0]
@@ -50,4 +59,4 @@ sflag.Parse(&cfg, sflag.Options{
 
 ## Supported Types (matches stdlib `flag`)
 
-`string`, `int`, `int64`, `uint`, `uint64`, `bool`, `float64`, `time.Duration`
+`string`, `int`, `int64`, `uint`, `uint64`, `bool`, `float64`, `time.Duration`, `[]string` (positional only)

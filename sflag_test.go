@@ -646,3 +646,427 @@ func TestUnicodeAutoNameAndShort(t *testing.T) {
 		t.Errorf("Éclair: got %q, want vanilla", cfg.Éclair)
 	}
 }
+
+// --- Positional args tests ---
+
+func TestPositionalBasic(t *testing.T) {
+	type Config struct {
+		Source string `positional:"" help:"input file"`
+		Target string `positional:"" help:"output file"`
+	}
+
+	os.Args = []string{"test", "src.txt", "dst.txt"}
+	var cfg Config
+	args, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Source != "src.txt" {
+		t.Errorf("Source: got %q, want src.txt", cfg.Source)
+	}
+	if cfg.Target != "dst.txt" {
+		t.Errorf("Target: got %q, want dst.txt", cfg.Target)
+	}
+	if args != nil {
+		t.Errorf("args: got %v, want nil", args)
+	}
+}
+
+func TestPositionalWithFlags(t *testing.T) {
+	type Config struct {
+		Verbose bool   `flag:"verbose" short:"v" help:"Verbose"`
+		Source  string `positional:"" help:"input"`
+		Target  string `positional:"" help:"output"`
+	}
+
+	os.Args = []string{"test", "-v", "in.txt", "out.txt"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Verbose {
+		t.Error("Verbose should be true")
+	}
+	if cfg.Source != "in.txt" {
+		t.Errorf("Source: got %q, want in.txt", cfg.Source)
+	}
+	if cfg.Target != "out.txt" {
+		t.Errorf("Target: got %q, want out.txt", cfg.Target)
+	}
+}
+
+func TestPositionalVariadic(t *testing.T) {
+	type Config struct {
+		Source string   `positional:"" help:"input"`
+		Files  []string `positional:"" help:"additional files"`
+	}
+
+	os.Args = []string{"test", "src.txt", "a.txt", "b.txt", "c.txt"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Source != "src.txt" {
+		t.Errorf("Source: got %q, want src.txt", cfg.Source)
+	}
+	if len(cfg.Files) != 3 {
+		t.Fatalf("Files len: got %d, want 3", len(cfg.Files))
+	}
+	if cfg.Files[0] != "a.txt" || cfg.Files[1] != "b.txt" || cfg.Files[2] != "c.txt" {
+		t.Errorf("Files: got %v", cfg.Files)
+	}
+}
+
+func TestPositionalVariadicEmpty(t *testing.T) {
+	type Config struct {
+		Source string   `positional:"" help:"input"`
+		Files  []string `positional:"" help:"additional files"`
+	}
+
+	os.Args = []string{"test", "src.txt"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Source != "src.txt" {
+		t.Errorf("Source: got %q, want src.txt", cfg.Source)
+	}
+	if len(cfg.Files) != 0 {
+		t.Errorf("Files: got %v, want empty", cfg.Files)
+	}
+}
+
+func TestPositionalVariadicOnly(t *testing.T) {
+	type Config struct {
+		Files []string `positional:"" help:"files"`
+	}
+
+	os.Args = []string{"test", "a.txt", "b.txt"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Files) != 2 {
+		t.Fatalf("Files len: got %d, want 2", len(cfg.Files))
+	}
+	if cfg.Files[0] != "a.txt" || cfg.Files[1] != "b.txt" {
+		t.Errorf("Files: got %v", cfg.Files)
+	}
+}
+
+func TestPositionalInt(t *testing.T) {
+	type Config struct {
+		Port int `positional:"" help:"port"`
+	}
+
+	os.Args = []string{"test", "8080"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Port != 8080 {
+		t.Errorf("Port: got %d, want 8080", cfg.Port)
+	}
+}
+
+func TestPositionalBool(t *testing.T) {
+	type Config struct {
+		Force bool `positional:"" help:"force"`
+	}
+
+	os.Args = []string{"test", "true"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Force {
+		t.Error("Force should be true")
+	}
+}
+
+func TestPositionalDuration(t *testing.T) {
+	type Config struct {
+		Timeout time.Duration `positional:"" help:"timeout"`
+	}
+
+	os.Args = []string{"test", "30s"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Timeout != 30*time.Second {
+		t.Errorf("Timeout: got %v, want 30s", cfg.Timeout)
+	}
+}
+
+func TestPositionalFloat64(t *testing.T) {
+	type Config struct {
+		Rate float64 `positional:"" help:"rate"`
+	}
+
+	os.Args = []string{"test", "1.5"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Rate != 1.5 {
+		t.Errorf("Rate: got %f, want 1.5", cfg.Rate)
+	}
+}
+
+func TestPositionalMissingError(t *testing.T) {
+	type Config struct {
+		Source string `positional:"" help:"input"`
+		Target string `positional:"" help:"output"`
+	}
+
+	os.Args = []string{"test", "only-one.txt"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err == nil {
+		t.Fatal("expected error for missing positional, got nil")
+	}
+}
+
+func TestPositionalTooManyError(t *testing.T) {
+	type Config struct {
+		Source string `positional:"" help:"input"`
+	}
+
+	os.Args = []string{"test", "a.txt", "b.txt"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	// This should still work - extra args go to the returned slice
+	// Actually no, with positional fields we consume them.
+	// But there's no variadic, so extra args should error.
+	if err == nil {
+		t.Fatal("expected error for too many positional args, got nil")
+	}
+}
+
+func TestPositionalFlagIgnored(t *testing.T) {
+	type Config struct {
+		Source string `flag:"source" positional:"" help:"input"`
+	}
+
+	// --source should NOT work, positional should consume args
+	os.Args = []string{"test", "file.txt"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Source != "file.txt" {
+		t.Errorf("Source: got %q, want file.txt", cfg.Source)
+	}
+}
+
+func TestPositionalNonContiguousError(t *testing.T) {
+	type Config struct {
+		Source string `positional:"" help:"input"`
+		Extra  string `flag:"extra" help:"extra flag"`
+		Target string `positional:"" help:"output"`
+	}
+
+	os.Args = []string{"test", "a", "b"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err == nil {
+		t.Fatal("expected error for non-contiguous positionals, got nil")
+	}
+}
+
+func TestPositionalVariadicNotLastError(t *testing.T) {
+	type Config struct {
+		Files []string `positional:"" help:"files"`
+		Target string  `positional:"" help:"target"`
+	}
+
+	os.Args = []string{"test", "a", "b"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err == nil {
+		t.Fatal("expected error for variadic not last, got nil")
+	}
+}
+
+func TestPositionalUnsupportedTypeError(t *testing.T) {
+	type Config struct {
+		Values []int `positional:"" help:"values"`
+	}
+
+	os.Args = []string{"test", "1", "2"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err == nil {
+		t.Fatal("expected error for unsupported positional type, got nil")
+	}
+}
+
+func TestPositionalInvalidIntError(t *testing.T) {
+	type Config struct {
+		Port int `positional:"" help:"port"`
+	}
+
+	os.Args = []string{"test", "not-a-port"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err == nil {
+		t.Fatal("expected error for invalid int positional, got nil")
+	}
+}
+
+func TestPositionalInvalidBoolError(t *testing.T) {
+	type Config struct {
+		Force bool `positional:"" help:"force"`
+	}
+
+	os.Args = []string{"test", "maybe"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err == nil {
+		t.Fatal("expected error for invalid bool positional, got nil")
+	}
+}
+
+func TestPositionalWithDoubleDash(t *testing.T) {
+	type Config struct {
+		Source string `positional:"" help:"input"`
+	}
+
+	os.Args = []string{"test", "--", "file.txt"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Source != "file.txt" {
+		t.Errorf("Source: got %q, want file.txt", cfg.Source)
+	}
+}
+
+func TestPositionalReturnNil(t *testing.T) {
+	type Config struct {
+		Source string `positional:"" help:"input"`
+	}
+
+	os.Args = []string{"test", "file.txt"}
+	var cfg Config
+	args, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if args != nil {
+		t.Errorf("args: got %v, want nil when positionals are defined", args)
+	}
+}
+
+func TestPositionalNoPositionalsReturnsArgs(t *testing.T) {
+	type Config struct {
+		Verbose bool `flag:"verbose" help:"Verbose"`
+	}
+
+	os.Args = []string{"test", "file1.txt", "file2.txt"}
+	var cfg Config
+	args, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(args) != 2 {
+		t.Errorf("args len: got %d, want 2", len(args))
+	}
+}
+
+func TestPositionalDefault(t *testing.T) {
+	type Config struct {
+		Output string `positional:"" default:"output.mp4" help:"output file"`
+	}
+
+	os.Args = []string{"test"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Output != "output.mp4" {
+		t.Errorf("Output: got %q, want output.mp4", cfg.Output)
+	}
+}
+
+func TestPositionalDefaultOverridden(t *testing.T) {
+	type Config struct {
+		Output string `positional:"" default:"output.mp4" help:"output file"`
+	}
+
+	os.Args = []string{"test", "custom.mov"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Output != "custom.mov" {
+		t.Errorf("Output: got %q, want custom.mov", cfg.Output)
+	}
+}
+
+func TestPositionalDefaultWithFlags(t *testing.T) {
+	type Config struct {
+		Verbose bool   `flag:"verbose" short:"v" help:"Verbose"`
+		Source  string `positional:"" help:"input"`
+		Output  string `positional:"" default:"out.txt" help:"output"`
+	}
+
+	// Only provide Source, Output should use default
+	os.Args = []string{"test", "-v", "in.txt"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Verbose {
+		t.Error("Verbose should be true")
+	}
+	if cfg.Source != "in.txt" {
+		t.Errorf("Source: got %q, want in.txt", cfg.Source)
+	}
+	if cfg.Output != "out.txt" {
+		t.Errorf("Output: got %q, want out.txt", cfg.Output)
+	}
+}
+
+func TestPositionalDefaultInt(t *testing.T) {
+	type Config struct {
+		Port int `positional:"" default:"8080" help:"port"`
+	}
+
+	os.Args = []string{"test"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Port != 8080 {
+		t.Errorf("Port: got %d, want 8080", cfg.Port)
+	}
+}
+
+func TestPositionalMissingNoDefaultError(t *testing.T) {
+	type Config struct {
+		Source string `positional:"" help:"input"`
+	}
+
+	os.Args = []string{"test"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err == nil {
+		t.Fatal("expected error for missing positional without default, got nil")
+	}
+}
