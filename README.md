@@ -4,20 +4,20 @@ A minimal, opinionated library for struct-tagged CLI flags for Go. Zero deps, wr
 
 ## Example
 ```go
-var cfg struct {
+var flags struct {
   Verbose    bool
   Date       string  `help:"in YYYY-MM-DD format"`
   Range      string  `default:"7d" help:"Range of data"`
   Rate       float64 `short:"R"`
-  MaxRetries int     `flag:"max" default:"3" help:"Max retries"`
+  MaxRetries int     `flag:"max" short:"" default:"3" help:"Max retries"`
 }
-args, err := sflag.Parse(&cfg)
-fmt.Println(cfg.Date)
+args, err := sflag.Parse(&flags)
+fmt.Println(flags.Date)
 fmt.Println(args)
 ```
 
 ### Help example
-<img width="891" height="360" alt="image" src="https://github.com/user-attachments/assets/832c9dc2-a21e-4b40-8f36-56dc517fa060" />
+<img width="801" height="322" alt="image" src="https://github.com/user-attachments/assets/e37b5721-e811-4400-a5fe-2f7576a30f1f" />
 
 ## Features
 
