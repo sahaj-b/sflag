@@ -509,3 +509,140 @@ func TestStringDefaultEmpty(t *testing.T) {
 		t.Errorf("Output: got %q, want %q", cfg.Output, "json")
 	}
 }
+
+func TestInvalidDefaultReturnsError(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  any
+	}{
+		{"int", &struct {
+			Count int `default:"abc"`
+		}{}},
+		{"bool", &struct {
+			Enabled bool `default:"maybe"`
+		}{}},
+		{"duration", &struct {
+			Timeout time.Duration `default:"soon"`
+		}{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			os.Args = []string{"test"}
+			_, err := Parse(tt.cfg)
+			if err == nil {
+				t.Fatal("expected invalid default error, got nil")
+			}
+		})
+	}
+}
+
+func TestUnsupportedFieldTypeReturnsError(t *testing.T) {
+	type Config struct {
+		Values []string
+	}
+
+	os.Args = []string{"test"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err == nil {
+		t.Fatal("expected unsupported type error, got nil")
+	}
+}
+
+func TestUnexportedFieldReturnsError(t *testing.T) {
+	type Config struct {
+		name string `flag:"name"`
+	}
+
+	os.Args = []string{"test"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err == nil {
+		t.Fatal("expected unexported field error, got nil")
+	}
+}
+
+func TestDuplicateFlagNamesReturnError(t *testing.T) {
+	type Config struct {
+		First  string `flag:"name"`
+		Second string `flag:"name"`
+	}
+
+	os.Args = []string{"test"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err == nil {
+		t.Fatal("expected duplicate flag error, got nil")
+	}
+}
+
+func TestDuplicateShortNamesReturnError(t *testing.T) {
+	type Config struct {
+		First  string `short:"n"`
+		Second string `short:"n"`
+	}
+
+	os.Args = []string{"test"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err == nil {
+		t.Fatal("expected duplicate short flag error, got nil")
+	}
+}
+
+func TestLongAndShortNamesShareNamespace(t *testing.T) {
+	type Config struct {
+		First  string `flag:"name"`
+		Second string `short:"name"`
+	}
+
+	os.Args = []string{"test"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err == nil {
+		t.Fatal("expected duplicate flag namespace error, got nil")
+	}
+}
+
+func TestEmptyShortTagDisablesAutoShort(t *testing.T) {
+	type Config struct {
+		Range  string `short:"" default:"7d" help:"Range"`
+		Output string `default:"text" help:"Output"`
+	}
+
+	// -r should fail, --range should work, -o should work for Output
+	os.Args = []string{"test", "-r", "bad"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err == nil {
+		t.Fatal("expected error for disabled short flag -r")
+	}
+
+	// -o should work since Output has no short tag and auto-short is on
+	os.Args = []string{"test", "-o", "csv"}
+	var cfg2 Config
+	_, err = Parse(&cfg2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg2.Output != "csv" {
+		t.Errorf("Output: got %q, want csv", cfg2.Output)
+	}
+}
+
+func TestUnicodeAutoNameAndShort(t *testing.T) {
+	type Config struct {
+		Éclair string
+	}
+
+	os.Args = []string{"test", "-é", "vanilla"}
+	var cfg Config
+	_, err := Parse(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Éclair != "vanilla" {
+		t.Errorf("Éclair: got %q, want vanilla", cfg.Éclair)
+	}
+}
