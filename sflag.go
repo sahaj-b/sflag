@@ -13,12 +13,11 @@ import (
 )
 
 var (
-	cBold      string
-	cGreen     string
-	cBlue      string
-	cYellow    string
-	cReset     string
-	parsedArgs []string
+	cBold   string
+	cGreen  string
+	cBlue   string
+	cYellow string
+	cReset  string
 )
 
 func setColors(on bool) {
@@ -142,13 +141,7 @@ func Parse(target any, opts ...Options) ([]string, error) {
 		setColors(useColor && isWriterTerminal(os.Stderr))
 		showHelp(os.Stderr, progName, definedFlags)
 	}
-	parsedArgs = fs.Args()
-	return parsedArgs, err
-}
-
-// Args returns the positional arguments from the last Parse call.
-func Args() []string {
-	return parsedArgs
+	return fs.Args(), err
 }
 
 func registerField(fs *flag.FlagSet, field reflect.StructField, fieldVal reflect.Value, longName, shortName, def, help string) flagDef {
