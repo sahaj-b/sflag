@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -71,7 +72,7 @@ type Options struct {
 //   - default:"val" – default value as string
 //   - help:"text"   – help description
 //
-// Supported field types: string, int, bool, float64.
+// Supported field types: string, int, int64, uint, uint64, bool, float64, time.Duration.
 func Parse(target any, opts ...Options) ([]string, error) {
 	rv := reflect.ValueOf(target)
 	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Struct {
@@ -186,6 +187,55 @@ func registerField(fs *flag.FlagSet, field reflect.StructField, fieldVal reflect
 			clearShortHelp(fs, shortName)
 		}
 
+	case reflect.Int64:
+		if field.Type == reflect.TypeOf(time.Duration(0)) {
+			var defDur time.Duration
+			if def != "" {
+				defDur, _ = time.ParseDuration(def)
+			}
+			ptr := fieldVal.Addr().Interface().(*time.Duration)
+			fs.DurationVar(ptr, longName, defDur, help)
+			if shortName != "" {
+				fs.DurationVar(ptr, shortName, defDur, "")
+				clearShortHelp(fs, shortName)
+			}
+		} else {
+			var defInt64 int64
+			if def != "" {
+				fmt.Sscanf(def, "%d", &defInt64)
+			}
+			ptr := fieldVal.Addr().Interface().(*int64)
+			fs.Int64Var(ptr, longName, defInt64, help)
+			if shortName != "" {
+				fs.Int64Var(ptr, shortName, defInt64, "")
+				clearShortHelp(fs, shortName)
+			}
+		}
+
+	case reflect.Uint:
+		var defUint uint64
+		if def != "" {
+			fmt.Sscanf(def, "%d", &defUint)
+		}
+		ptr := fieldVal.Addr().Interface().(*uint)
+		fs.UintVar(ptr, longName, uint(defUint), help)
+		if shortName != "" {
+			fs.UintVar(ptr, shortName, uint(defUint), "")
+			clearShortHelp(fs, shortName)
+		}
+
+	case reflect.Uint64:
+		var defUint64 uint64
+		if def != "" {
+			fmt.Sscanf(def, "%d", &defUint64)
+		}
+		ptr := fieldVal.Addr().Interface().(*uint64)
+		fs.Uint64Var(ptr, longName, defUint64, help)
+		if shortName != "" {
+			fs.Uint64Var(ptr, shortName, defUint64, "")
+			clearShortHelp(fs, shortName)
+		}
+
 	case reflect.Bool:
 		defBool := def == "true"
 		ptr := fieldVal.Addr().Interface().(*bool)
@@ -221,8 +271,17 @@ func typeNameFor(t reflect.Type) string {
 	switch t.Kind() {
 	case reflect.String:
 		return "string"
-	case reflect.Int, reflect.Int64:
+	case reflect.Int:
 		return "int"
+	case reflect.Int64:
+		if t == reflect.TypeOf(time.Duration(0)) {
+			return "duration"
+		}
+		return "int64"
+	case reflect.Uint:
+		return "uint"
+	case reflect.Uint64:
+		return "uint64"
 	case reflect.Float64:
 		return "float"
 	default:
