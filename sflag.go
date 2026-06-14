@@ -13,28 +13,28 @@ import (
 )
 
 var (
-	cBold  string
-	cGreen string
-	cBlue  string
-	cYellow string
-	cReset string
+	cBold      string
+	cGreen     string
+	cBlue      string
+	cYellow    string
+	cReset     string
 	parsedArgs []string
 )
 
-func initColors() {
-	cBold = "\x1b[1m"
-	cGreen = "\x1b[32m"
-	cBlue = "\x1b[34m"
-	cYellow = "\x1b[33m"
-	cReset = "\x1b[0m"
-}
-
-func resetColors() {
-	cBold = ""
-	cGreen = ""
-	cBlue = ""
-	cYellow = ""
-	cReset = ""
+func setColors(on bool) {
+	if on {
+		cBold = "\x1b[1m"
+		cGreen = "\x1b[32m"
+		cBlue = "\x1b[34m"
+		cYellow = "\x1b[33m"
+		cReset = "\x1b[0m"
+	} else {
+		cBold = ""
+		cGreen = ""
+		cBlue = ""
+		cYellow = ""
+		cReset = ""
+	}
 }
 
 type flagDef struct {
@@ -62,14 +62,13 @@ type Options struct {
 	NoColor bool
 }
 
-
 // Parse registers flags from struct tags, parses os.Args[1:], and returns
 // any remaining positional arguments. target must be a pointer to a struct.
 //
 // Struct tags:
 //   - flag:"name"   – long flag name (default: kebab-case of field name)
 //   - short:"x"     – short flag (default: first char of long name, skipped on conflict)
-//   - default:"val" – default value as string
+//   - default:"val" – default value as string (default: zero value)
 //   - help:"text"   – help description
 //
 // Supported field types: string, int, int64, uint, uint64, bool, float64, time.Duration.
@@ -87,9 +86,7 @@ func Parse(target any, opts ...Options) ([]string, error) {
 	doAutoName := !o.NoAutoName
 	doAutoShort := !o.NoAutoShort
 
-	if !o.NoColor && os.Getenv("NO_COLOR") == "" {
-		initColors()
-	}
+	useColor := !o.NoColor && os.Getenv("NO_COLOR") == ""
 
 	progName := o.ProgramName
 	if progName == "" {
@@ -137,20 +134,12 @@ func Parse(target any, opts ...Options) ([]string, error) {
 
 	err := fs.Parse(os.Args[1:])
 	if err == flag.ErrHelp {
-		if !o.NoColor && os.Getenv("NO_COLOR") == "" && isWriterTerminal(os.Stdout) {
-			initColors()
-		} else {
-			resetColors()
-		}
+		setColors(useColor && isWriterTerminal(os.Stdout))
 		showHelp(os.Stdout, progName, definedFlags)
 		os.Exit(0)
 	}
 	if err != nil {
-		if !o.NoColor && os.Getenv("NO_COLOR") == "" && isWriterTerminal(os.Stderr) {
-			initColors()
-		} else {
-			resetColors()
-		}
+		setColors(useColor && isWriterTerminal(os.Stderr))
 		showHelp(os.Stderr, progName, definedFlags)
 	}
 	parsedArgs = fs.Args()
@@ -188,7 +177,7 @@ func registerField(fs *flag.FlagSet, field reflect.StructField, fieldVal reflect
 		}
 
 	case reflect.Int64:
-		if field.Type == reflect.TypeOf(time.Duration(0)) {
+		if field.Type == reflect.TypeFor[time.Duration]() {
 			var defDur time.Duration
 			if def != "" {
 				defDur, _ = time.ParseDuration(def)
@@ -274,7 +263,7 @@ func typeNameFor(t reflect.Type) string {
 	case reflect.Int:
 		return "int"
 	case reflect.Int64:
-		if t == reflect.TypeOf(time.Duration(0)) {
+		if t == reflect.TypeFor[time.Duration]() {
 			return "duration"
 		}
 		return "int64"
@@ -310,25 +299,22 @@ func showHelp(w io.Writer, prog string, flags []flagDef) {
 
 	maxW := 0
 	for _, f := range flags {
-		w := len(flagLabelPlain(f))
+		label := flagLabel(f)
 		if f.typeName != "" {
-			w += 1 + len(f.typeName)
+			label += " " + f.typeName
 		}
-		if w > maxW {
-			maxW = w
+		if n := len(stripAnsi(label)); n > maxW {
+			maxW = n
 		}
 	}
 	maxW += 2
 
 	for _, f := range flags {
-		label := flagLabelColored(f)
+		label := flagLabel(f)
 		if f.typeName != "" {
 			label += " " + cBlue + f.typeName + cReset
 		}
-		plainLen := len(flagLabelPlain(f))
-		if f.typeName != "" {
-			plainLen += 1 + len(f.typeName)
-		}
+		plainLen := len(stripAnsi(label))
 		padding := strings.Repeat(" ", maxW-plainLen)
 		helpStr := f.help
 		if f.defStr != "" {
@@ -338,20 +324,27 @@ func showHelp(w io.Writer, prog string, flags []flagDef) {
 	}
 
 	hLabel := cGreen + "-h, --help" + cReset
-	padding := strings.Repeat(" ", maxW-len("-h, --help"))
+	padding := strings.Repeat(" ", maxW-len(stripAnsi(hLabel)))
 	fmt.Fprintf(w, "  %s%sDisplay help information\n", hLabel, padding)
 }
 
-func flagLabelPlain(f flagDef) string {
-	if f.short != "" {
-		return fmt.Sprintf("-%s, --%s", f.short, f.long)
-	}
-	return fmt.Sprintf("    --%s", f.long)
-}
-
-func flagLabelColored(f flagDef) string {
+func flagLabel(f flagDef) string {
 	if f.short != "" {
 		return cGreen + fmt.Sprintf("-%s, --%s", f.short, f.long) + cReset
 	}
 	return cGreen + fmt.Sprintf("    --%s", f.long) + cReset
+}
+
+func stripAnsi(s string) string {
+	var out strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\x1b' && i+1 < len(s) && s[i+1] == '[' {
+			for i < len(s) && s[i] != 'm' {
+				i++
+			}
+			continue
+		}
+		out.WriteByte(s[i])
+	}
+	return out.String()
 }
