@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -93,8 +94,9 @@ func Parse(target any, opts ...Options) ([]string, error) {
 	}
 
 	fs := flag.NewFlagSet(progName, flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
 	var definedFlags []flagDef
-	usedShorts := make(map[rune]bool)
+	usedNames := make(map[string]bool)
 
 	structVal := rv.Elem()
 	structType := structVal.Type()
@@ -110,22 +112,38 @@ func Parse(target any, opts ...Options) ([]string, error) {
 		if longName == "" {
 			continue
 		}
+		if !fieldVal.CanAddr() || !fieldVal.CanInterface() {
+			return nil, fmt.Errorf("sflag: field %s must be exported", field.Name)
+		}
+		if usedNames[longName] {
+			return nil, fmt.Errorf("sflag: duplicate flag name %q", longName)
+		}
+		usedNames[longName] = true
 
-		shortName := field.Tag.Get("short")
-		if shortName != "" {
-			usedShorts[rune(shortName[0])] = true
+		shortName, hasShort := field.Tag.Lookup("short")
+		if hasShort {
+			if shortName == "" {
+				// explicit `short:""` → no short flag
+			} else if usedNames[shortName] {
+				return nil, fmt.Errorf("sflag: duplicate flag name %q", shortName)
+			} else {
+				usedNames[shortName] = true
+			}
 		} else if doAutoShort {
-			first := rune(longName[0])
-			if !usedShorts[first] {
-				shortName = string(first)
-				usedShorts[first] = true
+			first := firstRune(longName)
+			if !usedNames[first] {
+				shortName = first
+				usedNames[first] = true
 			}
 		}
 
 		help := field.Tag.Get("help")
 		def := field.Tag.Get("default")
 
-		info := registerField(fs, field, fieldVal, longName, shortName, def, help)
+		info, err := registerField(fs, field, fieldVal, longName, shortName, def, help)
+		if err != nil {
+			return nil, err
+		}
 		definedFlags = append(definedFlags, info)
 	}
 
@@ -144,7 +162,7 @@ func Parse(target any, opts ...Options) ([]string, error) {
 	return fs.Args(), err
 }
 
-func registerField(fs *flag.FlagSet, field reflect.StructField, fieldVal reflect.Value, longName, shortName, def, help string) flagDef {
+func registerField(fs *flag.FlagSet, field reflect.StructField, fieldVal reflect.Value, longName, shortName, def, help string) (flagDef, error) {
 	typeName := typeNameFor(field.Type)
 	info := flagDef{long: longName, short: shortName, typeName: typeName, defStr: def, help: help}
 
@@ -152,101 +170,99 @@ func registerField(fs *flag.FlagSet, field reflect.StructField, fieldVal reflect
 	case reflect.String:
 		ptr := fieldVal.Addr().Interface().(*string)
 		fs.StringVar(ptr, longName, def, help)
-		if shortName != "" {
-			fs.StringVar(ptr, shortName, def, "")
-			clearShortHelp(fs, shortName)
-		}
+		registerShort(fs, shortName, func() { fs.StringVar(ptr, shortName, def, "") })
 
 	case reflect.Int:
-		defInt := 0
-		if def != "" {
-			fmt.Sscanf(def, "%d", &defInt)
+		defInt, err := parseDefault(def, strconv.Atoi)
+		if err != nil {
+			return info, defaultError(field.Name, def, err)
 		}
 		ptr := fieldVal.Addr().Interface().(*int)
 		fs.IntVar(ptr, longName, defInt, help)
-		if shortName != "" {
-			fs.IntVar(ptr, shortName, defInt, "")
-			clearShortHelp(fs, shortName)
-		}
+		registerShort(fs, shortName, func() { fs.IntVar(ptr, shortName, defInt, "") })
 
 	case reflect.Int64:
 		if field.Type == reflect.TypeFor[time.Duration]() {
-			var defDur time.Duration
-			if def != "" {
-				defDur, _ = time.ParseDuration(def)
+			defDur, err := parseDefault(def, time.ParseDuration)
+			if err != nil {
+				return info, defaultError(field.Name, def, err)
 			}
 			ptr := fieldVal.Addr().Interface().(*time.Duration)
 			fs.DurationVar(ptr, longName, defDur, help)
-			if shortName != "" {
-				fs.DurationVar(ptr, shortName, defDur, "")
-				clearShortHelp(fs, shortName)
-			}
+			registerShort(fs, shortName, func() { fs.DurationVar(ptr, shortName, defDur, "") })
 		} else {
-			var defInt64 int64
-			if def != "" {
-				fmt.Sscanf(def, "%d", &defInt64)
+			defInt64, err := parseDefault(def, func(s string) (int64, error) { return strconv.ParseInt(s, 10, 64) })
+			if err != nil {
+				return info, defaultError(field.Name, def, err)
 			}
 			ptr := fieldVal.Addr().Interface().(*int64)
 			fs.Int64Var(ptr, longName, defInt64, help)
-			if shortName != "" {
-				fs.Int64Var(ptr, shortName, defInt64, "")
-				clearShortHelp(fs, shortName)
-			}
+			registerShort(fs, shortName, func() { fs.Int64Var(ptr, shortName, defInt64, "") })
 		}
 
 	case reflect.Uint:
-		var defUint uint64
-		if def != "" {
-			fmt.Sscanf(def, "%d", &defUint)
+		defUint64, err := parseDefault(def, func(s string) (uint64, error) { return strconv.ParseUint(s, 10, 0) })
+		if err != nil {
+			return info, defaultError(field.Name, def, err)
 		}
 		ptr := fieldVal.Addr().Interface().(*uint)
-		fs.UintVar(ptr, longName, uint(defUint), help)
-		if shortName != "" {
-			fs.UintVar(ptr, shortName, uint(defUint), "")
-			clearShortHelp(fs, shortName)
-		}
+		fs.UintVar(ptr, longName, uint(defUint64), help)
+		registerShort(fs, shortName, func() { fs.UintVar(ptr, shortName, uint(defUint64), "") })
 
 	case reflect.Uint64:
-		var defUint64 uint64
-		if def != "" {
-			fmt.Sscanf(def, "%d", &defUint64)
+		defUint64, err := parseDefault(def, func(s string) (uint64, error) { return strconv.ParseUint(s, 10, 64) })
+		if err != nil {
+			return info, defaultError(field.Name, def, err)
 		}
 		ptr := fieldVal.Addr().Interface().(*uint64)
 		fs.Uint64Var(ptr, longName, defUint64, help)
-		if shortName != "" {
-			fs.Uint64Var(ptr, shortName, defUint64, "")
-			clearShortHelp(fs, shortName)
-		}
+		registerShort(fs, shortName, func() { fs.Uint64Var(ptr, shortName, defUint64, "") })
 
 	case reflect.Bool:
-		defBool := def == "true"
+		defBool, err := parseDefault(def, strconv.ParseBool)
+		if err != nil {
+			return info, defaultError(field.Name, def, err)
+		}
 		ptr := fieldVal.Addr().Interface().(*bool)
 		fs.BoolVar(ptr, longName, defBool, help)
-		if shortName != "" {
-			fs.BoolVar(ptr, shortName, defBool, "")
-			clearShortHelp(fs, shortName)
-		}
+		registerShort(fs, shortName, func() { fs.BoolVar(ptr, shortName, defBool, "") })
 
 	case reflect.Float64:
-		defFloat := 0.0
-		if def != "" {
-			fmt.Sscanf(def, "%f", &defFloat)
+		defFloat, err := parseDefault(def, func(s string) (float64, error) { return strconv.ParseFloat(s, 64) })
+		if err != nil {
+			return info, defaultError(field.Name, def, err)
 		}
 		ptr := fieldVal.Addr().Interface().(*float64)
 		fs.Float64Var(ptr, longName, defFloat, help)
-		if shortName != "" {
-			fs.Float64Var(ptr, shortName, defFloat, "")
-			clearShortHelp(fs, shortName)
-		}
+		registerShort(fs, shortName, func() { fs.Float64Var(ptr, shortName, defFloat, "") })
+
+	default:
+		return info, fmt.Errorf("sflag: field %s has unsupported type %s", field.Name, field.Type)
 	}
 
-	return info
+	return info, nil
 }
 
-func clearShortHelp(fs *flag.FlagSet, name string) {
+func registerShort(fs *flag.FlagSet, name string, register func()) {
+	if name == "" {
+		return
+	}
+	register()
 	if f := fs.Lookup(name); f != nil {
 		f.Usage = ""
 	}
+}
+
+func parseDefault[T any](def string, parse func(string) (T, error)) (T, error) {
+	var zero T
+	if def == "" {
+		return zero, nil
+	}
+	return parse(def)
+}
+
+func defaultError(fieldName, def string, err error) error {
+	return fmt.Errorf("sflag: invalid default %q for field %s: %w", def, fieldName, err)
 }
 
 func typeNameFor(t reflect.Type) string {
@@ -272,18 +288,26 @@ func typeNameFor(t reflect.Type) string {
 }
 
 func toKebab(s string) string {
-	var out []rune
-	for i, r := range s {
+	runes := []rune(s)
+	out := make([]rune, 0, len(runes))
+	for i, r := range runes {
 		if i > 0 && unicode.IsUpper(r) {
-			prev := rune(s[i-1])
-			if unicode.IsLower(prev) ||
-				(unicode.IsUpper(prev) && i+1 < len(s) && unicode.IsLower(rune(s[i+1]))) {
+			prev := runes[i-1]
+			nextIsLower := i+1 < len(runes) && unicode.IsLower(runes[i+1])
+			if unicode.IsLower(prev) || (unicode.IsUpper(prev) && nextIsLower) {
 				out = append(out, '-')
 			}
 		}
 		out = append(out, unicode.ToLower(r))
 	}
 	return string(out)
+}
+
+func firstRune(s string) string {
+	for _, r := range s {
+		return string(r)
+	}
+	return ""
 }
 
 func showHelp(w io.Writer, prog string, flags []flagDef) {
