@@ -24,8 +24,7 @@ fmt.Println(flags.Date)
 
 - **Auto names**: field `ApiKey` → `--api-key` (kebab-case)
 - **Auto shorts**: first char of flag name. Conflicts silently skipped
-- **Positional args**: returned from `Parse`, also `--` stops flag parsing, same as `flag` 
-- **Positional args**: `positional:""` tag binds CLI positionals to struct fields
+- **Positional args**: `positional:""` tag binds CLI positionals to struct fields; `--` stops flag parsing, same as `flag`
 - **Colored help**: and plain text when piped (unix-based). [**`NO_COLOR`**](https://no-color.org/) respected
 - **Stdlib `flag`** behavior: `-myflag`, `--myflag`, and `--myflag=true` all work
 
@@ -46,6 +45,13 @@ fmt.Println(flags.Date)
 - `flag:""` tags on positional fields are ignored
 - `default:"val"` in positional fields make them optional (wrapped in `[]` in help)
 - `default:"val"` is ignored for **variadic**(`[]string`) positionals
+
+## Parsing
+
+- `Parse` (`Parse(target any, opts ...Options)`) reads `os.Args[1:]`
+- `ParseArgs` (`ParseArgs(target any, args []string, opts ...Options)`) accepts explicit args
+- `-h` / `--help` prints usage and calls `os.Exit(0)`
+- invalid flags prints the error and usage, then returns an error (does not exit)
 
 ## Options
 ```go
