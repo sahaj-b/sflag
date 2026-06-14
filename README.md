@@ -11,8 +11,9 @@ var cfg struct {
   Rate       float64 `short:"R"`
   MaxRetries int     `flag:"max" default:"3" help:"Max retries"`
 }
-err := sflag.Parse(&cfg)
+args, err := sflag.Parse(&cfg)
 fmt.Println(cfg.Date)
+fmt.Println(args)
 ```
 
 ### Help example
@@ -23,7 +24,8 @@ fmt.Println(cfg.Date)
 - **Auto names**: field `ApiKey` → `--api-key` (kebab-case)
 - **Auto shorts**: first char of flag name. Conflicts silently skipped
 - **Positional args**: returned from `Parse`, also `--` stops flag parsing, same as `flag` 
-- **Colored help**: and plain text when piped (unix-based). [**`NO_COLOR`**](https://no-color.org/) respected 
+- **Colored help**: and plain text when piped (unix-based). [**`NO_COLOR`**](https://no-color.org/) respected
+- **Stdlib `flag`** behavior: `-flag`, `--flag`, and `--flag=true` all work
 
 ## Tags
 
