@@ -18,7 +18,7 @@ func TestParseDefaults(t *testing.T) {
 	os.Args = []string{"test"}
 
 	var cfg TestConfig
-	args, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,16 +38,13 @@ func TestParseDefaults(t *testing.T) {
 	if cfg.Output != "json" {
 		t.Errorf("Output: got %q, want %q", cfg.Output, "json")
 	}
-	if len(args) != 0 {
-		t.Errorf("args: got %v, want empty", args)
-	}
 }
 
 func TestParseWithFlags(t *testing.T) {
 	os.Args = []string{"test", "--range", "30d", "-d", "5", "--full", "-R", "2.0", "--output", "csv", "file1.txt", "file2.txt"}
 
 	var cfg TestConfig
-	args, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,9 +63,6 @@ func TestParseWithFlags(t *testing.T) {
 	}
 	if cfg.Output != "csv" {
 		t.Errorf("Output: got %q, want %q", cfg.Output, "csv")
-	}
-	if len(args) != 2 || args[0] != "file1.txt" || args[1] != "file2.txt" {
-		t.Errorf("args: got %v, want [file1.txt file2.txt]", args)
 	}
 }
 
@@ -103,7 +97,7 @@ func TestPositionalArgs(t *testing.T) {
 	os.Args = []string{"test", "-n", "alice", "arg1", "arg2", "arg3"}
 
 	var cfg MinimalConfig
-	args, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,28 +105,19 @@ func TestPositionalArgs(t *testing.T) {
 	if cfg.Name != "alice" {
 		t.Errorf("Name: got %q, want %q", cfg.Name, "alice")
 	}
-	if len(args) != 3 {
-		t.Errorf("args len: got %d, want 3", len(args))
-	}
-	if args[0] != "arg1" || args[1] != "arg2" || args[2] != "arg3" {
-		t.Errorf("args: got %v", args)
-	}
 }
 
 func TestDoubleDash(t *testing.T) {
 	os.Args = []string{"test", "--name", "bob", "--", "--not-a-flag"}
 
 	var cfg MinimalConfig
-	args, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if cfg.Name != "bob" {
 		t.Errorf("Name: got %q, want %q", cfg.Name, "bob")
-	}
-	if len(args) != 1 || args[0] != "--not-a-flag" {
-		t.Errorf("args: got %v, want [--not-a-flag]", args)
 	}
 }
 
@@ -142,13 +127,9 @@ func TestEmptyStruct(t *testing.T) {
 	os.Args = []string{"test", "just", "args"}
 
 	var cfg EmptyConfig
-	args, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if len(args) != 2 {
-		t.Errorf("args len: got %d, want 2", len(args))
 	}
 }
 
@@ -357,7 +338,7 @@ func TestInvalidIntValue(t *testing.T) {
 	os.Args = []string{"test", "--days", "abc"}
 
 	var cfg TestConfig
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected error for invalid int value, got nil")
 	}
@@ -367,7 +348,7 @@ func TestInvalidUintValue(t *testing.T) {
 	os.Args = []string{"test", "--port", "-1"}
 
 	var cfg ExtendedTypesConfig
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected error for negative uint value, got nil")
 	}
@@ -377,7 +358,7 @@ func TestInvalidFloatValue(t *testing.T) {
 	os.Args = []string{"test", "--rate", "not-a-float"}
 
 	var cfg TestConfig
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected error for invalid float value, got nil")
 	}
@@ -387,7 +368,7 @@ func TestInvalidDurationValue(t *testing.T) {
 	os.Args = []string{"test", "--timeout", "not-duration"}
 
 	var cfg ExtendedTypesConfig
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected error for invalid duration value, got nil")
 	}
@@ -397,7 +378,7 @@ func TestUnknownFlag(t *testing.T) {
 	os.Args = []string{"test", "--bogus"}
 
 	var cfg MinimalConfig
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected error for unknown flag, got nil")
 	}
@@ -407,16 +388,13 @@ func TestDoubleDashTreatsRemainderAsPositional(t *testing.T) {
 	os.Args = []string{"test", "--full", "--", "--full"}
 
 	var cfg TestConfig
-	args, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if !cfg.Full {
 		t.Error("Full should be true from --full before --")
-	}
-	if len(args) != 1 || args[0] != "--full" {
-		t.Errorf("args: got %v, want [--full]", args)
 	}
 }
 
@@ -529,7 +507,7 @@ func TestInvalidDefaultReturnsError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Args = []string{"test"}
-			_, err := Parse(tt.cfg)
+			err := Parse(tt.cfg)
 			if err == nil {
 				t.Fatal("expected invalid default error, got nil")
 			}
@@ -544,7 +522,7 @@ func TestUnsupportedFieldTypeReturnsError(t *testing.T) {
 
 	os.Args = []string{"test"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected unsupported type error, got nil")
 	}
@@ -557,7 +535,7 @@ func TestUnexportedFieldReturnsError(t *testing.T) {
 
 	os.Args = []string{"test"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected unexported field error, got nil")
 	}
@@ -571,7 +549,7 @@ func TestDuplicateFlagNamesReturnError(t *testing.T) {
 
 	os.Args = []string{"test"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected duplicate flag error, got nil")
 	}
@@ -585,7 +563,7 @@ func TestDuplicateShortNamesReturnError(t *testing.T) {
 
 	os.Args = []string{"test"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected duplicate short flag error, got nil")
 	}
@@ -599,7 +577,7 @@ func TestLongAndShortNamesShareNamespace(t *testing.T) {
 
 	os.Args = []string{"test"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected duplicate flag namespace error, got nil")
 	}
@@ -614,7 +592,7 @@ func TestEmptyShortTagDisablesAutoShort(t *testing.T) {
 	// -r should fail, --range should work, -o should work for Output
 	os.Args = []string{"test", "-r", "bad"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected error for disabled short flag -r")
 	}
@@ -622,7 +600,7 @@ func TestEmptyShortTagDisablesAutoShort(t *testing.T) {
 	// -o should work since Output has no short tag and auto-short is on
 	os.Args = []string{"test", "-o", "csv"}
 	var cfg2 Config
-	_, err = Parse(&cfg2)
+	err = Parse(&cfg2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -638,7 +616,7 @@ func TestUnicodeAutoNameAndShort(t *testing.T) {
 
 	os.Args = []string{"test", "-é", "vanilla"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -657,7 +635,7 @@ func TestPositionalBasic(t *testing.T) {
 
 	os.Args = []string{"test", "src.txt", "dst.txt"}
 	var cfg Config
-	args, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -666,9 +644,6 @@ func TestPositionalBasic(t *testing.T) {
 	}
 	if cfg.Target != "dst.txt" {
 		t.Errorf("Target: got %q, want dst.txt", cfg.Target)
-	}
-	if args != nil {
-		t.Errorf("args: got %v, want nil", args)
 	}
 }
 
@@ -681,7 +656,7 @@ func TestPositionalWithFlags(t *testing.T) {
 
 	os.Args = []string{"test", "-v", "in.txt", "out.txt"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -704,7 +679,7 @@ func TestPositionalVariadic(t *testing.T) {
 
 	os.Args = []string{"test", "src.txt", "a.txt", "b.txt", "c.txt"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -727,7 +702,7 @@ func TestPositionalVariadicEmpty(t *testing.T) {
 
 	os.Args = []string{"test", "src.txt"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -746,7 +721,7 @@ func TestPositionalVariadicOnly(t *testing.T) {
 
 	os.Args = []string{"test", "a.txt", "b.txt"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -765,7 +740,7 @@ func TestPositionalInt(t *testing.T) {
 
 	os.Args = []string{"test", "8080"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -781,7 +756,7 @@ func TestPositionalBool(t *testing.T) {
 
 	os.Args = []string{"test", "true"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -797,7 +772,7 @@ func TestPositionalDuration(t *testing.T) {
 
 	os.Args = []string{"test", "30s"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -813,7 +788,7 @@ func TestPositionalFloat64(t *testing.T) {
 
 	os.Args = []string{"test", "1.5"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -830,7 +805,7 @@ func TestPositionalMissingError(t *testing.T) {
 
 	os.Args = []string{"test", "only-one.txt"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected error for missing positional, got nil")
 	}
@@ -843,7 +818,7 @@ func TestPositionalTooManyError(t *testing.T) {
 
 	os.Args = []string{"test", "a.txt", "b.txt"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	// This should still work - extra args go to the returned slice
 	// Actually no, with positional fields we consume them.
 	// But there's no variadic, so extra args should error.
@@ -860,7 +835,7 @@ func TestPositionalFlagIgnored(t *testing.T) {
 	// --source should NOT work, positional should consume args
 	os.Args = []string{"test", "file.txt"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -878,7 +853,7 @@ func TestPositionalNonContiguousError(t *testing.T) {
 
 	os.Args = []string{"test", "a", "b"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected error for non-contiguous positionals, got nil")
 	}
@@ -892,7 +867,7 @@ func TestPositionalVariadicNotLastError(t *testing.T) {
 
 	os.Args = []string{"test", "a", "b"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected error for variadic not last, got nil")
 	}
@@ -905,7 +880,7 @@ func TestPositionalUnsupportedTypeError(t *testing.T) {
 
 	os.Args = []string{"test", "1", "2"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected error for unsupported positional type, got nil")
 	}
@@ -918,7 +893,7 @@ func TestPositionalInvalidIntError(t *testing.T) {
 
 	os.Args = []string{"test", "not-a-port"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected error for invalid int positional, got nil")
 	}
@@ -931,7 +906,7 @@ func TestPositionalInvalidBoolError(t *testing.T) {
 
 	os.Args = []string{"test", "maybe"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected error for invalid bool positional, got nil")
 	}
@@ -944,7 +919,7 @@ func TestPositionalWithDoubleDash(t *testing.T) {
 
 	os.Args = []string{"test", "--", "file.txt"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -953,37 +928,7 @@ func TestPositionalWithDoubleDash(t *testing.T) {
 	}
 }
 
-func TestPositionalReturnNil(t *testing.T) {
-	type Config struct {
-		Source string `positional:"" help:"input"`
-	}
 
-	os.Args = []string{"test", "file.txt"}
-	var cfg Config
-	args, err := Parse(&cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if args != nil {
-		t.Errorf("args: got %v, want nil when positionals are defined", args)
-	}
-}
-
-func TestPositionalNoPositionalsReturnsArgs(t *testing.T) {
-	type Config struct {
-		Verbose bool `flag:"verbose" help:"Verbose"`
-	}
-
-	os.Args = []string{"test", "file1.txt", "file2.txt"}
-	var cfg Config
-	args, err := Parse(&cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(args) != 2 {
-		t.Errorf("args len: got %d, want 2", len(args))
-	}
-}
 
 func TestPositionalDefault(t *testing.T) {
 	type Config struct {
@@ -992,7 +937,7 @@ func TestPositionalDefault(t *testing.T) {
 
 	os.Args = []string{"test"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1008,7 +953,7 @@ func TestPositionalDefaultOverridden(t *testing.T) {
 
 	os.Args = []string{"test", "custom.mov"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1027,7 +972,7 @@ func TestPositionalDefaultWithFlags(t *testing.T) {
 	// Only provide Source, Output should use default
 	os.Args = []string{"test", "-v", "in.txt"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1049,7 +994,7 @@ func TestPositionalDefaultInt(t *testing.T) {
 
 	os.Args = []string{"test"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1065,7 +1010,7 @@ func TestPositionalMissingNoDefaultError(t *testing.T) {
 
 	os.Args = []string{"test"}
 	var cfg Config
-	_, err := Parse(&cfg)
+	err := Parse(&cfg)
 	if err == nil {
 		t.Fatal("expected error for missing positional without default, got nil")
 	}
