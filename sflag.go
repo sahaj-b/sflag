@@ -3,6 +3,7 @@ package sflag
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -20,13 +21,19 @@ var (
 )
 
 func initColors() {
-	if isTerminal() {
-		cBold = "\x1b[1m"
-		cGreen = "\x1b[32m"
-		cBlue = "\x1b[34m"
-		cYellow = "\x1b[33m"
-		cReset = "\x1b[0m"
-	}
+	cBold = "\x1b[1m"
+	cGreen = "\x1b[32m"
+	cBlue = "\x1b[34m"
+	cYellow = "\x1b[33m"
+	cReset = "\x1b[0m"
+}
+
+func resetColors() {
+	cBold = ""
+	cGreen = ""
+	cBlue = ""
+	cYellow = ""
+	cReset = ""
 }
 
 type flagDef struct {
@@ -42,24 +49,18 @@ type Options struct {
 	// ProgramName is shown in the usage message. Default: os.Args[0].
 	ProgramName string
 
-	// AutoName derives flag names from field names in kebab-case.
-	// e.g., ApiKey → --api-key. Default: true.
-	AutoName *bool
+	// NoAutoName disables kebab-case name derivation from field names.
+	// e.g., without it ApiKey → --api-key. Default: false.
+	NoAutoName bool
 
-	// AutoShort derives short flags from the first char of the long name.
-	// Skipped if it conflicts with an already-registered short. Default: true.
-	AutoShort *bool
+	// NoAutoShort disables short flag derivation from first char.
+	// Skipped if it conflicts with an already-registered short. Default: false.
+	NoAutoShort bool
 
 	// NoColor disables colored help output. Default: false (auto-detect).
 	NoColor bool
 }
 
-func optBool(p *bool) bool {
-	if p == nil {
-		return true
-	}
-	return *p
-}
 
 // Parse registers flags from struct tags, parses os.Args[1:], and returns
 // any remaining positional arguments. target must be a pointer to a struct.
@@ -82,10 +83,10 @@ func Parse(target any, opts ...Options) ([]string, error) {
 		o = opts[0]
 	}
 
-	doAutoName := optBool(o.AutoName)
-	doAutoShort := optBool(o.AutoShort)
+	doAutoName := !o.NoAutoName
+	doAutoShort := !o.NoAutoShort
 
-	if !o.NoColor && os.Getenv("NO_COLOR") == "" && isTerminal() {
+	if !o.NoColor && os.Getenv("NO_COLOR") == "" {
 		initColors()
 	}
 
@@ -94,7 +95,7 @@ func Parse(target any, opts ...Options) ([]string, error) {
 		progName = filepath.Base(os.Args[0])
 	}
 
-	fs := flag.NewFlagSet(progName, flag.ExitOnError)
+	fs := flag.NewFlagSet(progName, flag.ContinueOnError)
 	var definedFlags []flagDef
 	usedShorts := make(map[rune]bool)
 
@@ -131,11 +132,26 @@ func Parse(target any, opts ...Options) ([]string, error) {
 		definedFlags = append(definedFlags, info)
 	}
 
-	fs.Usage = func() {
-		showHelp(fs, progName, definedFlags)
-	}
+	fs.Usage = func() {} // we handle output ourselves
 
 	err := fs.Parse(os.Args[1:])
+	if err == flag.ErrHelp {
+		if !o.NoColor && os.Getenv("NO_COLOR") == "" && isWriterTerminal(os.Stdout) {
+			initColors()
+		} else {
+			resetColors()
+		}
+		showHelp(os.Stdout, progName, definedFlags)
+		os.Exit(0)
+	}
+	if err != nil {
+		if !o.NoColor && os.Getenv("NO_COLOR") == "" && isWriterTerminal(os.Stderr) {
+			initColors()
+		} else {
+			resetColors()
+		}
+		showHelp(os.Stderr, progName, definedFlags)
+	}
 	parsedArgs = fs.Args()
 	return parsedArgs, err
 }
@@ -229,9 +245,9 @@ func toKebab(s string) string {
 	return string(out)
 }
 
-func showHelp(_ *flag.FlagSet, prog string, flags []flagDef) {
-	fmt.Fprintf(os.Stderr, "%sUsage:%s %s [options] [args]\n\n", cBold, cReset, prog)
-	fmt.Fprintf(os.Stderr, "%sOptions:%s\n", cBold, cReset)
+func showHelp(w io.Writer, prog string, flags []flagDef) {
+	fmt.Fprintf(w, "%sUsage:%s %s [options] [args]\n\n", cBold, cReset, prog)
+	fmt.Fprintf(w, "%sOptions:%s\n", cBold, cReset)
 
 	maxW := 0
 	for _, f := range flags {
@@ -259,12 +275,12 @@ func showHelp(_ *flag.FlagSet, prog string, flags []flagDef) {
 		if f.defStr != "" {
 			helpStr += " " + cYellow + "(default: " + f.defStr + ")" + cReset
 		}
-		fmt.Fprintf(os.Stderr, "  %s%s%s\n", label, padding, helpStr)
+		fmt.Fprintf(w, "  %s%s%s\n", label, padding, helpStr)
 	}
 
 	hLabel := cGreen + "-h, --help" + cReset
 	padding := strings.Repeat(" ", maxW-len("-h, --help"))
-	fmt.Fprintf(os.Stderr, "  %s%sDisplay help information\n", hLabel, padding)
+	fmt.Fprintf(w, "  %s%sDisplay help information\n", hLabel, padding)
 }
 
 func flagLabelPlain(f flagDef) string {

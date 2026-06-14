@@ -2,4 +2,6 @@
 
 package sflag
 
-func isTerminal() bool { return false }
+import "io"
+
+func isWriterTerminal(_ io.Writer) bool { return false }

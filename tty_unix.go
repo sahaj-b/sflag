@@ -3,6 +3,7 @@
 package sflag
 
 import (
+	"io"
 	"os"
 	"runtime"
 	"syscall"
@@ -16,12 +17,16 @@ const (
 
 type winsize struct{ row, col, xpixel, ypixel uint16 }
 
-func isTerminal() bool {
+func isWriterTerminal(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
 	var ws winsize
 	req := uintptr(tioWinszLinux)
 	if runtime.GOOS == "darwin" {
 		req = uintptr(tioWinszDarwin)
 	}
-	_, _, err := syscall.Syscall(syscall.SYS_IOCTL, os.Stderr.Fd(), req, uintptr(unsafe.Pointer(&ws)))
+	_, _, err := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), req, uintptr(unsafe.Pointer(&ws)))
 	return err == 0
 }
