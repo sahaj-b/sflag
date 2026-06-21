@@ -60,6 +60,7 @@ sflag.Parse(&cfg, sflag.Options{
   NoAutoName:   true,    // disable kebab-case derivation, default: false
   NoAutoShort:  true,    // disable short derivation, default: false
   NoColor:      true,    // force no colors, default: false
+  ExtraUsage:   "\nExamples:\n  myapp --format json file.txt", // extra text appended to help
 })
 ```
 

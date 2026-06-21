@@ -81,7 +81,7 @@ func TestParseBoolVariants(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Args = tt.args
 			var cfg TestConfig
-			Parse(&cfg)
+			_ = Parse(&cfg)
 			if cfg.Full != tt.want {
 				t.Errorf("Full: got %v, want %v", cfg.Full, tt.want)
 			}
@@ -93,7 +93,7 @@ type MinimalConfig struct {
 	Name string `flag:"name" short:"n" default:"world" help:"Name to greet"`
 }
 
-func TestPositionalArgs(t *testing.T) {
+func TestExtraArgsIgnored(t *testing.T) {
 	os.Args = []string{"test", "-n", "alice", "arg1", "arg2", "arg3"}
 
 	var cfg MinimalConfig
@@ -137,7 +137,7 @@ func TestProgramName(t *testing.T) {
 	os.Args = []string{"myapp"}
 
 	var cfg MinimalConfig
-	Parse(&cfg, Options{ProgramName: "custom"})
+	_ = Parse(&cfg, Options{ProgramName: "custom"})
 
 	if cfg.Name != "world" {
 		t.Errorf("Name: got %q, want default %q", cfg.Name, "world")
@@ -155,7 +155,7 @@ func TestAutoNameFromFieldName(t *testing.T) {
 	os.Args = []string{"test", "--range", "30d", "-d", "5", "--full", "--output", "json"}
 
 	var cfg AutoNameConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if cfg.Range != "30d" {
 		t.Errorf("Range: got %q, want %q", cfg.Range, "30d")
@@ -182,7 +182,7 @@ func TestShortConflictSkips(t *testing.T) {
 	os.Args = []string{"test", "--range", "a", "--rate", "b", "--retries", "5", "-o", "x"}
 
 	var cfg KebabAutoShortConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if cfg.Range != "a" {
 		t.Errorf("Range: got %q", cfg.Range)
@@ -207,7 +207,7 @@ func TestAutoNameDisabled(t *testing.T) {
 	os.Args = []string{"test", "--range", "30d", "-d", "5"}
 
 	var cfg NoAutoConfig
-	Parse(&cfg, Options{NoAutoName: true})
+	_ = Parse(&cfg, Options{NoAutoName: true})
 
 	if cfg.Range != "30d" {
 		t.Errorf("Range: got %q, want %q", cfg.Range, "30d")
@@ -221,7 +221,7 @@ func TestAutoShortDisabled(t *testing.T) {
 	os.Args = []string{"test", "--range", "30d"}
 
 	var cfg AutoNameConfig
-	Parse(&cfg, Options{NoAutoShort: true})
+	_ = Parse(&cfg, Options{NoAutoShort: true})
 
 	if cfg.Range != "30d" {
 		t.Errorf("Range: got %q, want %q", cfg.Range, "30d")
@@ -239,7 +239,7 @@ func TestInt64(t *testing.T) {
 	os.Args = []string{"test", "--id", "9999999999"}
 
 	var cfg ExtendedTypesConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if cfg.ID != 9999999999 {
 		t.Errorf("ID: got %d, want 9999999999", cfg.ID)
@@ -250,7 +250,7 @@ func TestInt64Default(t *testing.T) {
 	os.Args = []string{"test"}
 
 	var cfg ExtendedTypesConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if cfg.ID != 42 {
 		t.Errorf("ID: got %d, want 42", cfg.ID)
@@ -261,7 +261,7 @@ func TestUint(t *testing.T) {
 	os.Args = []string{"test", "-p", "9090"}
 
 	var cfg ExtendedTypesConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if cfg.Port != 9090 {
 		t.Errorf("Port: got %d, want 9090", cfg.Port)
@@ -272,7 +272,7 @@ func TestUintDefault(t *testing.T) {
 	os.Args = []string{"test"}
 
 	var cfg ExtendedTypesConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if cfg.Port != 8080 {
 		t.Errorf("Port: got %d, want 8080", cfg.Port)
@@ -283,7 +283,7 @@ func TestUint64(t *testing.T) {
 	os.Args = []string{"test", "--size", "9999999"}
 
 	var cfg ExtendedTypesConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if cfg.Size != 9999999 {
 		t.Errorf("Size: got %d, want 9999999", cfg.Size)
@@ -294,7 +294,7 @@ func TestUint64Default(t *testing.T) {
 	os.Args = []string{"test"}
 
 	var cfg ExtendedTypesConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if cfg.Size != 1048576 {
 		t.Errorf("Size: got %d, want 1048576", cfg.Size)
@@ -305,7 +305,7 @@ func TestDuration(t *testing.T) {
 	os.Args = []string{"test", "-t", "30s"}
 
 	var cfg ExtendedTypesConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if cfg.Timeout != 30*time.Second {
 		t.Errorf("Timeout: got %v, want 30s", cfg.Timeout)
@@ -316,7 +316,7 @@ func TestDurationDefault(t *testing.T) {
 	os.Args = []string{"test"}
 
 	var cfg ExtendedTypesConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if cfg.Timeout != 5*time.Second {
 		t.Errorf("Timeout: got %v, want 5s", cfg.Timeout)
@@ -327,7 +327,7 @@ func TestDurationComplex(t *testing.T) {
 	os.Args = []string{"test", "--timeout", "2m30s"}
 
 	var cfg ExtendedTypesConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if cfg.Timeout != 150*time.Second {
 		t.Errorf("Timeout: got %v, want 2m30s", cfg.Timeout)
@@ -402,7 +402,7 @@ func TestStringWithSpaces(t *testing.T) {
 	os.Args = []string{"test", "--name", "hello world"}
 
 	var cfg MinimalConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if cfg.Name != "hello world" {
 		t.Errorf("Name: got %q, want %q", cfg.Name, "hello world")
@@ -417,7 +417,7 @@ func TestBoolDefaultTrue(t *testing.T) {
 	os.Args = []string{"test"}
 
 	var cfg BoolConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if !cfg.Verbose {
 		t.Error("Verbose should default to true")
@@ -432,7 +432,7 @@ func TestBoolDefaultTrueOverridden(t *testing.T) {
 	os.Args = []string{"test", "--verbose=false"}
 
 	var cfg BoolConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if cfg.Verbose {
 		t.Error("Verbose should be false after override")
@@ -443,7 +443,7 @@ func TestNoColorOption(t *testing.T) {
 	os.Args = []string{"test"}
 
 	var cfg MinimalConfig
-	Parse(&cfg, Options{NoColor: true})
+	_ = Parse(&cfg, Options{NoColor: true})
 
 	if cfg.Name != "world" {
 		t.Errorf("Name: got %q, want default %q", cfg.Name, "world")
@@ -454,7 +454,7 @@ func TestNegativeInt(t *testing.T) {
 	os.Args = []string{"test", "--days", "-5"}
 
 	var cfg TestConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if cfg.Days != -5 {
 		t.Errorf("Days: got %d, want -5", cfg.Days)
@@ -469,7 +469,7 @@ func TestFloat64ZeroDefault(t *testing.T) {
 	os.Args = []string{"test"}
 
 	var cfg FloatConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	if cfg.Rate != 0.0 {
 		t.Errorf("Rate: got %f, want 0.0", cfg.Rate)
@@ -480,7 +480,7 @@ func TestStringDefaultEmpty(t *testing.T) {
 	os.Args = []string{"test"}
 
 	var cfg TestConfig
-	Parse(&cfg)
+	_ = Parse(&cfg)
 
 	// Output has default "json", Range has default "7d"
 	if cfg.Output != "json" {
@@ -530,7 +530,7 @@ func TestUnsupportedFieldTypeReturnsError(t *testing.T) {
 
 func TestUnexportedFieldReturnsError(t *testing.T) {
 	type Config struct {
-		name string `flag:"name"`
+		name string `flag:"name"` //nolint:unused // intentionally unexported to trigger ensureExported error
 	}
 
 	os.Args = []string{"test"}

@@ -21,6 +21,9 @@ type Options struct {
 
 	// NoColor disables colored help output. Default: false (auto-detect).
 	NoColor bool
+
+	// ExtraUsage is additional text appended after the default help output.
+	ExtraUsage string
 }
 
 // Parse registers flags from struct tags, parses os.Args[1:], and binds
@@ -63,17 +66,17 @@ func ParseArgs(target any, args []string, opts ...Options) error {
 	err = fs.Parse(args)
 	if err == flag.ErrHelp {
 		setColors(useColor && isWriterTerminal(os.Stdout))
-		showHelp(os.Stdout, progName, flags, positionals)
+		showHelp(os.Stdout, progName, flags, positionals, o)
 		os.Exit(0)
 	}
 	if err != nil {
 		setColors(useColor && isWriterTerminal(os.Stderr))
-		showHelp(os.Stderr, progName, flags, positionals)
+		showHelp(os.Stderr, progName, flags, positionals, o)
 		return err
 	}
 	if err := bindPositionals(positionals, fs.Args()); err != nil {
 		setColors(useColor && isWriterTerminal(os.Stderr))
-		showHelp(os.Stderr, progName, flags, positionals)
+		showHelp(os.Stderr, progName, flags, positionals, o)
 		return err
 	}
 	return nil

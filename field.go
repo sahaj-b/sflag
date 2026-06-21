@@ -12,29 +12,37 @@ import (
 
 var durationType = reflect.TypeFor[time.Duration]()
 
-type flagDef struct {
-	long     string
-	short    string
-	typeName string
-	defStr   string
-	help     string
+// FlagInfo describes a registered flag, used in custom usage functions.
+type FlagInfo struct {
+	Long     string
+	Short    string
+	TypeName string
+	DefStr   string
+	Help     string
+}
+
+// PositionalInfo describes a registered positional argument, used in custom usage functions.
+type PositionalInfo struct {
+	Name       string
+	TypeName   string
+	DefStr     string
+	Help       string
+	IsVariadic bool
 }
 
 type positionalDef struct {
-	field      reflect.StructField
-	fieldVal   reflect.Value
-	help       string
-	defStr     string
-	isVariadic bool
+	field    reflect.StructField
+	fieldVal reflect.Value
+	info     PositionalInfo
 }
 
-func bindStruct(fs *flag.FlagSet, target any, o Options) ([]flagDef, []positionalDef, error) {
+func bindStruct(fs *flag.FlagSet, target any, o Options) ([]FlagInfo, []positionalDef, error) {
 	rv := reflect.ValueOf(target)
 	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Struct {
 		panic("sflag: Parse target must be a pointer to a struct")
 	}
 
-	var flags []flagDef
+	var flags []FlagInfo
 	var positionals []positionalDef
 	usedNames := make(map[string]bool)
 	structVal := rv.Elem()
@@ -48,8 +56,8 @@ func bindStruct(fs *flag.FlagSet, target any, o Options) ([]flagDef, []positiona
 			if closedPositionals {
 				return nil, nil, fmt.Errorf("sflag: positional field %s must be grouped with other positional fields", field.Name)
 			}
-			if len(positionals) > 0 && positionals[len(positionals)-1].isVariadic {
-				return nil, nil, fmt.Errorf("sflag: variadic positional field %s must be the last positional field", positionals[len(positionals)-1].field.Name)
+			if len(positionals) > 0 && positionals[len(positionals)-1].info.IsVariadic {
+				return nil, nil, fmt.Errorf("sflag: variadic positional field %s must be the last positional field", positionals[len(positionals)-1].info.Name)
 			}
 			pos, err := newPositional(field, fieldVal)
 			if err != nil {
@@ -111,17 +119,23 @@ func newPositional(field reflect.StructField, fieldVal reflect.Value) (positiona
 		return positionalDef{}, err
 	}
 
-	pos := positionalDef{field: field, fieldVal: fieldVal, help: field.Tag.Get("help"), defStr: field.Tag.Get("default")}
+	pos := positionalDef{field: field, fieldVal: fieldVal}
+	pos.info.Name = strings.ToUpper(field.Name)
+	pos.info.Help = field.Tag.Get("help")
+	pos.info.DefStr = field.Tag.Get("default")
+
 	if field.Type.Kind() == reflect.Slice {
-		pos.defStr = ""
+		pos.info.DefStr = ""
 		if field.Type.Elem().Kind() != reflect.String {
 			return pos, fmt.Errorf("sflag: variadic positional field %s must be []string, got %s", field.Name, field.Type)
 		}
-		pos.isVariadic = true
+		pos.info.IsVariadic = true
 		return pos, nil
 	}
 
-	if _, ok := typeName(field.Type, true); !ok {
+	if tn, ok := typeName(field.Type, true); ok {
+		pos.info.TypeName = tn
+	} else {
 		return pos, fmt.Errorf("sflag: field %s has unsupported positional type %s", field.Name, field.Type)
 	}
 	return pos, nil
@@ -140,7 +154,7 @@ func bindPositionals(positionals []positionalDef, args []string) error {
 	}
 
 	required := len(positionals)
-	hasVariadic := positionals[required-1].isVariadic
+	hasVariadic := positionals[required-1].info.IsVariadic
 	if hasVariadic {
 		required--
 	}
@@ -150,7 +164,7 @@ func bindPositionals(positionals []positionalDef, args []string) error {
 	}
 
 	for i, pos := range positionals {
-		if pos.isVariadic {
+		if pos.info.IsVariadic {
 			if i < len(args) {
 				pos.fieldVal.Set(reflect.ValueOf(args[i:]))
 			} else {
@@ -160,34 +174,30 @@ func bindPositionals(positionals []positionalDef, args []string) error {
 		}
 		if i < len(args) {
 			if err := assign(pos.fieldVal, args[i]); err != nil {
-				return positionalError(pos, err)
+				return fmt.Errorf("sflag: positional argument %s: %w", pos.info.Name, err)
 			}
-		} else if pos.defStr != "" {
-			if err := assign(pos.fieldVal, pos.defStr); err != nil {
-				return positionalError(pos, err)
+		} else if pos.info.DefStr != "" {
+			if err := assign(pos.fieldVal, pos.info.DefStr); err != nil {
+				return fmt.Errorf("sflag: positional argument %s: %w", pos.info.Name, err)
 			}
 		} else {
-			return fmt.Errorf("sflag: missing positional argument: %s", strings.ToUpper(pos.field.Name))
+			return fmt.Errorf("sflag: missing positional argument: %s", pos.info.Name)
 		}
 	}
 	return nil
 }
 
-func positionalError(pos positionalDef, err error) error {
-	return fmt.Errorf("sflag: positional argument %s: %w", strings.ToUpper(pos.field.Name), err)
-}
-
-func registerField(fs *flag.FlagSet, field reflect.StructField, fieldVal reflect.Value, longName, shortName string) (flagDef, error) {
+func registerField(fs *flag.FlagSet, field reflect.StructField, fieldVal reflect.Value, longName, shortName string) (FlagInfo, error) {
 	name, ok := typeName(field.Type, false)
-	info := flagDef{long: longName, short: shortName, typeName: name, defStr: field.Tag.Get("default"), help: field.Tag.Get("help")}
+	info := FlagInfo{Long: longName, Short: shortName, TypeName: name, DefStr: field.Tag.Get("default"), Help: field.Tag.Get("help")}
 	if !ok {
 		return info, fmt.Errorf("sflag: field %s has unsupported type %s", field.Name, field.Type)
 	}
-	if err := assignDefault(fieldVal, info.defStr); err != nil {
-		return info, fmt.Errorf("sflag: invalid default %q for field %s: %w", info.defStr, field.Name, err)
+	if err := assignDefault(fieldVal, info.DefStr); err != nil {
+		return info, fmt.Errorf("sflag: invalid default %q for field %s: %w", info.DefStr, field.Name, err)
 	}
 
-	fs.Var(scalarValue{fieldVal}, longName, info.help)
+	fs.Var(scalarValue{fieldVal}, longName, info.Help)
 	if shortName != "" {
 		fs.Var(scalarValue{fieldVal}, shortName, "")
 	}

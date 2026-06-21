@@ -26,32 +26,31 @@ func setColors(on bool) {
 	cReset = "\x1b[0m"
 }
 
-func showHelp(w io.Writer, prog string, flags []flagDef, positionals []positionalDef) {
+func showHelp(w io.Writer, prog string, flags []FlagInfo, positionals []positionalDef, opts Options) {
 	usage := prog
 	if len(flags) > 0 {
 		usage += " [options]"
 	}
 	for _, p := range positionals {
-		name := strings.ToUpper(p.field.Name)
 		switch {
-		case p.isVariadic:
-			usage += " " + name + "..."
-		case p.defStr != "":
-			usage += " [" + name + "]"
+		case p.info.IsVariadic:
+			usage += " " + p.info.Name + "..."
+		case p.info.DefStr != "":
+			usage += " [" + p.info.Name + "]"
 		default:
-			usage += " " + name
+			usage += " " + p.info.Name
 		}
 	}
-	fmt.Fprintf(w, "%sUsage:%s %s\n\n", cBold, cReset, usage)
+	fmt.Fprintf(w, "%sUsage:%s %s\n\n", cBold, cReset, usage) //nolint:errcheck
 
 	if len(flags) > 0 {
 		rows := make([]helpRow, 0, len(flags)+1)
 		for _, f := range flags {
 			label := flagLabel(f)
-			if f.typeName != "" {
-				label += " " + cBlue + f.typeName + cReset
+			if f.TypeName != "" {
+				label += " " + cBlue + f.TypeName + cReset
 			}
-			rows = append(rows, helpRow{label: label, help: f.help, def: f.defStr})
+			rows = append(rows, helpRow{label: label, help: f.Help, def: f.DefStr})
 		}
 		rows = append(rows, helpRow{label: cGreen + "-h, --help" + cReset, help: "Display help information"})
 		printRows(w, "Options", rows)
@@ -59,13 +58,18 @@ func showHelp(w io.Writer, prog string, flags []flagDef, positionals []positiona
 
 	if len(positionals) > 0 {
 		if len(flags) > 0 {
-			fmt.Fprintln(w)
+			fmt.Fprintln(w) //nolint:errcheck
 		}
 		rows := make([]helpRow, 0, len(positionals))
 		for _, p := range positionals {
-			rows = append(rows, helpRow{label: positionalLabel(p), help: p.help, def: p.defStr})
+			rows = append(rows, helpRow{label: positionalLabel(p.info), help: p.info.Help, def: p.info.DefStr})
 		}
 		printRows(w, "Arguments", rows)
+	}
+
+	if opts.ExtraUsage != "" {
+		fmt.Fprintln(w)                  //nolint:errcheck
+		fmt.Fprintln(w, opts.ExtraUsage) //nolint:errcheck
 	}
 }
 
@@ -76,7 +80,7 @@ type helpRow struct {
 }
 
 func printRows(w io.Writer, title string, rows []helpRow) {
-	fmt.Fprintf(w, "%s%s:%s\n", cBold, title, cReset)
+	fmt.Fprintf(w, "%s%s:%s\n", cBold, title, cReset) //nolint:errcheck
 
 	width := 0
 	for _, row := range rows {
@@ -94,26 +98,26 @@ func printRows(w io.Writer, title string, rows []helpRow) {
 			}
 			help += cYellow + "(default: " + row.def + ")" + cReset
 		}
-		fmt.Fprintf(w, "  %s%s%s\n", row.label, strings.Repeat(" ", width-len(stripAnsi(row.label))), help)
+		fmt.Fprintf(w, "  %s%s%s\n", row.label, strings.Repeat(" ", width-len(stripAnsi(row.label))), help) //nolint:errcheck
 	}
 }
 
-func positionalLabel(p positionalDef) string {
-	name := "<" + strings.ToUpper(p.field.Name) + ">"
-	if p.isVariadic {
+func positionalLabel(p PositionalInfo) string {
+	name := "<" + p.Name + ">"
+	if p.IsVariadic {
 		return cGreen + name + "..." + cReset
 	}
-	if typeLabel, _ := typeName(p.field.Type, true); typeLabel != "" {
-		return cGreen + name + cReset + " " + cBlue + typeLabel + cReset
+	if p.TypeName != "" {
+		return cGreen + name + cReset + " " + cBlue + p.TypeName + cReset
 	}
 	return cGreen + name + cReset
 }
 
-func flagLabel(f flagDef) string {
-	if f.short != "" {
-		return cGreen + fmt.Sprintf("-%s, --%s", f.short, f.long) + cReset
+func flagLabel(f FlagInfo) string {
+	if f.Short != "" {
+		return cGreen + fmt.Sprintf("-%s, --%s", f.Short, f.Long) + cReset
 	}
-	return cGreen + fmt.Sprintf("    --%s", f.long) + cReset
+	return cGreen + fmt.Sprintf("    --%s", f.Long) + cReset
 }
 
 func stripAnsi(s string) string {
