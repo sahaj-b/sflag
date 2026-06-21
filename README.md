@@ -14,6 +14,9 @@ var flags struct {
   Files      []string      `positional:"" help:"Additional files"`
 }
 err := sflag.Parse(&flags)
+if err != nil {
+  log.Fatal(err)
+}
 fmt.Println(flags.Date)         
 ```
 
@@ -64,6 +67,6 @@ sflag.Parse(&cfg, sflag.Options{
 })
 ```
 
-## Supported Types (matches stdlib `flag`)
+## Supported Types
 
-`string`, `int`, `int64`, `uint`, `uint64`, `bool`, `float64`, `time.Duration`, `[]string` (positional only)
+`string`, `int`, `int8`, `int16`, `int32`, `int64`, `uint`, `uint8`, `uint16`, `uint32`, `uint64`, `bool`, `float64`, `time.Duration`, `[]string` (positional only)
