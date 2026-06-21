@@ -222,7 +222,7 @@ func assign(v reflect.Value, raw string) error {
 	switch v.Kind() {
 	case reflect.String:
 		v.SetString(raw)
-	case reflect.Int, reflect.Int64:
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if v.Type() == durationType {
 			d, err := time.ParseDuration(raw)
 			if err != nil {
@@ -236,7 +236,7 @@ func assign(v reflect.Value, raw string) error {
 			return fmt.Errorf("invalid %s %q: %w", v.Kind(), raw, err)
 		}
 		v.SetInt(n)
-	case reflect.Uint, reflect.Uint64:
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		n, err := strconv.ParseUint(raw, 10, v.Type().Bits())
 		if err != nil {
 			return fmt.Errorf("invalid %s %q: %w", v.Kind(), raw, err)
@@ -264,6 +264,12 @@ func typeName(t reflect.Type, includeBool bool) (string, bool) {
 		return "string", true
 	case reflect.Int:
 		return "int", true
+	case reflect.Int8:
+		return "int8", true
+	case reflect.Int16:
+		return "int16", true
+	case reflect.Int32:
+		return "int32", true
 	case reflect.Int64:
 		if t == durationType {
 			return "duration", true
@@ -271,6 +277,12 @@ func typeName(t reflect.Type, includeBool bool) (string, bool) {
 		return "int64", true
 	case reflect.Uint:
 		return "uint", true
+	case reflect.Uint8:
+		return "uint8", true
+	case reflect.Uint16:
+		return "uint16", true
+	case reflect.Uint32:
+		return "uint32", true
 	case reflect.Uint64:
 		return "uint64", true
 	case reflect.Float64:

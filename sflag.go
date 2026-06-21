@@ -36,7 +36,8 @@ type Options struct {
 //   - help:"text"       – help description
 //   - positional:""     – marks field as positional arg (field order = arg order)
 //
-// Supported field types: string, int, int64, uint, uint64, bool, float64, time.Duration.
+
+// Supported field types: string, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, bool, float64, time.Duration
 // Positional fields also support []string (must be last positional, captures remaining args).
 func Parse(target any, opts ...Options) error {
 	return ParseArgs(target, os.Args[1:], opts...)
