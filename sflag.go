@@ -66,19 +66,21 @@ func ParseArgs(target any, args []string, opts ...Options) error {
 
 	err = fs.Parse(args)
 	if err == flag.ErrHelp {
-		setColors(useColor && isWriterTerminal(os.Stdout))
+		setColors(useColor && isTerminal(os.Stdout))
 		showHelp(os.Stdout, progName, flags, positionals, o)
 		os.Exit(0)
 	}
 	if err != nil {
-		setColors(useColor && isWriterTerminal(os.Stderr))
+		setColors(useColor && isTerminal(os.Stderr))
 		showHelp(os.Stderr, progName, flags, positionals, o)
 		return err
 	}
 	if err := bindPositionals(positionals, fs.Args()); err != nil {
-		setColors(useColor && isWriterTerminal(os.Stderr))
+		setColors(useColor && isTerminal(os.Stderr))
 		showHelp(os.Stderr, progName, flags, positionals, o)
 		return err
 	}
 	return nil
 }
+
+
